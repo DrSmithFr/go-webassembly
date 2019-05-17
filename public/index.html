@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <meta charset="utf-8">
+    <script src="assets/wasm_exec.js"></script>
+
+</head>
+<body>
+<h1>Web assembly using go</h1>
+<script>
+    console.info('Loading web assembly');
+
+    if (WebAssembly) {
+        const go = new Go();
+        WebAssembly
+            .instantiateStreaming(fetch("assets/main.wasm"), go.importObject)
+            .then((result) => {
+                go.run(result.instance);
+            });
+    } else {
+        console.log("WebAssembly is not supported in your browser")
+    }
+</script>
+</body>
+</html>
