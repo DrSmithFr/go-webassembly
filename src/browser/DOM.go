@@ -8,7 +8,7 @@ func LoadDOM() DOM {
 	// loading default DOM data
 	window := js.Global()
 	document := window.Get("document")
-	body := window.Get("body")
+	body := document.Get("body")
 
 	// loading DOM size data
 	size := Size{
