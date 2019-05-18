@@ -11,7 +11,7 @@
 <h1>Web assembly using go</h1>
 <canvas id="renderer-canvas"></canvas>
 <script>
-    console.info('Loading web assembly');
+    console.info('Loading web assembly demo');
 
     if (WebAssembly) {
         const go = new Go();
@@ -21,7 +21,7 @@
         WebAssembly
             .instantiateStreaming(fetch("assets/main.wasm"), go.importObject)
             .then((result) => {
-                console.debug('wasm loaded');
+                console.debug('wasm loaded successfully');
                 go.run(result.instance).then(() => {
                     console.exception('wasm died unexpectedly');
                 });
@@ -30,16 +30,41 @@
         console.exception("WebAssembly not supported by browser")
     }
 
+    // This callback must be defined to retrieve the wasm api object
+    // TODO way to defined callback name during call
     document.onWasmLoad = function (wasm) {
+        // call wasm exposed api
+        // TODO switch to TS and use type hint to retrieve auto completion
+        const imageData = wasm.goImage(random(200, 400), random(100, 200));
+
+        // doFunStuff
+        renderImageData(imageData)
+    }
+</script>
+<script>
+    //
+    // unrelated to web assembly
+    //
+
+    function renderImageData(imageData) {
         // displaying image to canvas
         const canvas = document.getElementById('renderer-canvas');
         const ctx = canvas.getContext('2d');
 
+        console.debug('image loading');
+
         // creating javascript image
-        createImageBitmap(wasm.generate())
-            .then((image) => {
-                ctx.drawImage(image, 0, 0);
-            });
+        createImageBitmap(imageData)
+            .then(
+                (image) => {
+                    ctx.drawImage(image, 0, 0);
+                    console.debug('image rendered');
+                }
+            );
+    }
+
+    function random(min, max) {
+        return Math.floor(Math.random() * (+max - +min)) + +min;
     }
 </script>
 </body>

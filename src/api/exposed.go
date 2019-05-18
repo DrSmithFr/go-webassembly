@@ -10,15 +10,21 @@ import (
 func GetJavascriptObject(DOM browser.DOM) js.Value  {
 	wrapper := js.Global().Get("Object").New()
 
-	generateImage := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		img := rendering.MakeImage(int(DOM.Size.Width), int(DOM.Size.Height))
-		return mapper.ImageToImageData(img)
-	})
-
 	// @param {int} width
 	// @param {int} height
 	// @return {ImageData}
-	wrapper.Set("generate", generateImage)
+	wrapper.Set("goImage", generateImage())
 
 	return js.ValueOf(wrapper)
+}
+
+func generateImage() js.Func {
+	return js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		width := args[0]
+		height := args[1]
+
+		img := rendering.MakeImage(width.Int(), height.Int())
+
+		return mapper.ImageToImageData(img)
+	})
 }
