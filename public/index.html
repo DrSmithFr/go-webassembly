@@ -9,28 +9,37 @@
 </head>
 <body>
 <h1>Web assembly using go</h1>
+<canvas id="renderer-canvas"></canvas>
 <script>
     console.info('Loading web assembly');
 
     if (WebAssembly) {
         const go = new Go();
 
-        console.debug('loading');
+        console.debug('loading wasm...');
 
         WebAssembly
             .instantiateStreaming(fetch("assets/main.wasm"), go.importObject)
             .then((result) => {
-                console.debug('loaded');
-                go.run(result.instance).then(() =>{
-                    console.debug('go instance as died unexpectedly');
+                console.debug('wasm loaded');
+                go.run(result.instance).then(() => {
+                    console.exception('wasm died unexpectedly');
                 });
             });
     } else {
-        console.log("WebAssembly is not supported in your browser")
+        console.exception("WebAssembly not supported by browser")
     }
 
-    document.onWasmLoad = function(wasm) {
-        console.log('WASM loaded', wasm.generate())
+    document.onWasmLoad = function (wasm) {
+        // displaying image to canvas
+        const canvas = document.getElementById('renderer-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // creating javascript image
+        createImageBitmap(wasm.generate())
+            .then((image) => {
+                ctx.drawImage(image, 0, 0);
+            });
     }
 </script>
 </body>
