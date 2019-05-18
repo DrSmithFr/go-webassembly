@@ -1,44 +1,32 @@
 package main
 
 import (
-	"./browser"
 	"fmt"
+	"github.com/DrSmithFr/go-webassembly/src/api"
+	"github.com/DrSmithFr/go-webassembly/src/browser"
 	"syscall/js"
 )
 
 func main() {
-	emptyChannel := make(chan bool)
-
 	// loading DOM to memory
 	DOM := browser.LoadDOM()
 
 	// setting up everything
-	setup(DOM)
+	bindEvents(DOM)
+	bindAnimationFrame(DOM)
 
-	// creating rendered objects
-	canvas := makeCanvas(DOM)
-	ball := makeBall(canvas)
+	// Exposing our API
+	wrapper := api.GetJavascriptObject(DOM)
 
-	// binding rendered object to actual DOM
-	DOM.Body.Call("appendChild", canvas)
+	// give javascript control over the Go WASM API
+	callbackJavascript(DOM, wrapper)
 
-	// attempt to receive from empty channel
 	// allow daemon style process
-	<-emptyChannel
+	emptyChanToKeepAppRunning := make(chan bool)
+	<-emptyChanToKeepAppRunning
 }
 
-func setup(DOM browser.DOM) {
-	// javascript rendering func
-	var renderer js.Func
-
-	renderer = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		update(DOM)
-		return nil
-	})
-
-	// using browser animation frame
-	DOM.Window.Call("requestAnimationFrame", renderer)
-
+func bindEvents(DOM browser.DOM)  {
 	// let's handle that mouse pointer down
 	var mouseEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		clickEvent(DOM, args[0])
@@ -46,6 +34,30 @@ func setup(DOM browser.DOM) {
 	})
 
 	DOM.Window.Call("addEventListener", "pointerdown", mouseEventHandler)
+}
+
+func bindAnimationFrame(DOM browser.DOM)  {
+	// javascript rendering func
+	var renderer js.Func
+
+	renderer = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		update(DOM)
+		DOM.Window.Call("requestAnimationFrame", renderer)
+		return nil
+	})
+
+	// using browser animation frame
+	DOM.Window.Call("requestAnimationFrame", renderer)
+}
+
+func callbackJavascript(DOM browser.DOM, ApiWrapper js.Value)  {
+	callback := DOM.Document.Get("onWasmLoad")
+
+	if callback.Type() == js.TypeFunction {
+		callback.Invoke(ApiWrapper)
+	} else {
+		panic("document.onWasmLoad() is undefined in current DOM")
+	}
 }
 
 func update(DOM browser.DOM) {
@@ -57,21 +69,4 @@ func clickEvent(DOM browser.DOM, event js.Value) {
 	mouseY := event.Get("clientY").Int()
 
 	go DOM.Log(fmt.Sprintf("mouseEvent x:%d y:%d", mouseX, mouseY))
-}
-
-func makeCanvas(DOM browser.DOM) js.Value {
-	fmt.Printf("%v", DOM)
-
-	canvas := DOM.Document.Call("createElement", "canvas")
-
-	canvas.Set("height", DOM.Size.Height)
-	canvas.Set("width", DOM.Size.Width)
-
-	return canvas
-}
-
-func makeBall(canvas js.Value) js.Value {
-	ball := canvas.Call("getContext", "2d")
-	ball.Set("fillStyle", "red")
-	return ball
 }

@@ -14,13 +14,23 @@
 
     if (WebAssembly) {
         const go = new Go();
+
+        console.debug('loading');
+
         WebAssembly
             .instantiateStreaming(fetch("assets/main.wasm"), go.importObject)
             .then((result) => {
-                go.run(result.instance);
+                console.debug('loaded');
+                go.run(result.instance).then(() =>{
+                    console.debug('go instance as died unexpectedly');
+                });
             });
     } else {
         console.log("WebAssembly is not supported in your browser")
+    }
+
+    document.onWasmLoad = function(wasm) {
+        console.log('WASM loaded', wasm.generate())
     }
 </script>
 </body>
