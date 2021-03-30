@@ -5,11 +5,18 @@
     <title>Title</title>
     <meta charset="utf-8">
     <script src="assets/wasm_exec.js"></script>
+    <style>
+        html, body, canvas {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
 
+            height: 100vh;
+            width: 100vw;
+        }
+    </style>
 </head>
 <body>
-<h1>Web assembly using go</h1>
-<canvas id="renderer-canvas"></canvas>
 <script>
     console.info('Loading web assembly demo');
 
@@ -28,43 +35,6 @@
             });
     } else {
         console.exception("WebAssembly not supported by browser")
-    }
-
-    // This callback must be defined to retrieve the wasm api object
-    // TODO way to defined callback name during call
-    document.onWasmLoad = function (wasm) {
-        // call wasm exposed api
-        // TODO switch to TS and use type hint to retrieve auto completion
-        const imageData = wasm.goImage(random(200, 400), random(100, 200));
-
-        // doFunStuff
-        renderImageData(imageData)
-    }
-</script>
-<script>
-    //
-    // unrelated to web assembly
-    //
-
-    function renderImageData(imageData) {
-        // displaying image to canvas
-        const canvas = document.getElementById('renderer-canvas');
-        const ctx = canvas.getContext('2d');
-
-        console.debug('image loading');
-
-        // creating javascript image
-        createImageBitmap(imageData)
-            .then(
-                (image) => {
-                    ctx.drawImage(image, 0, 0);
-                    console.debug('image rendered');
-                }
-            );
-    }
-
-    function random(min, max) {
-        return Math.floor(Math.random() * (+max - +min)) + +min;
     }
 </script>
 </body>
