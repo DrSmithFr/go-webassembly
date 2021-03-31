@@ -4,6 +4,10 @@ import "math"
 
 type GameState struct {
 	level []int
+
+	mapX  int
+	mapY  int
+
 	blockSize int
 
 	playerX float64
@@ -30,6 +34,9 @@ func NewGameState(width, height int) (*GameState, error) {
 		1, 1, 1, 1, 1, 1, 1, 1,
 	}
 
+	gs.mapX = 8
+	gs.mapY = 8
+
 	// use all screen
 	gs.blockSize = int(math.Min(float64(width), float64(height))) / 8
 
@@ -42,6 +49,10 @@ func NewGameState(width, height int) (*GameState, error) {
 	return &gs, nil
 }
 
+func (gs *GameState) GetMapSize() (x int,y int) {
+	return gs.mapX, gs.mapY
+}
+
 func (gs *GameState) GetLevel() []int {
 	return gs.level
 }
@@ -52,6 +63,10 @@ func (gs *GameState) GetPlayerPosition()(x, y, deltaX, deltaY float64)  {
 
 func (gs *GameState) GetBlockSize() int  {
 	return gs.blockSize
+}
+
+func (gs *GameState) GetPlayerAngle() float64  {
+	return gs.playerAngle
 }
 
 func (gs *GameState) MoveUp() {

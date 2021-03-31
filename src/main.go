@@ -7,6 +7,7 @@ import (
 	"github.com/llgcode/draw2d/draw2dimg"
 	"github.com/llgcode/draw2d/draw2dkit"
 	"image/color"
+	"math"
 	"syscall/js"
 )
 
@@ -15,11 +16,12 @@ var cvs *browser.Canvas2d
 var gs *wolfenstein.GameState
 
 type move struct {
-	up bool
-	down bool
-	left bool
+	up    bool
+	down  bool
+	left  bool
 	right bool
 }
+
 var keyboard = move{false, false, false, false}
 
 var width float64
@@ -145,12 +147,139 @@ func Render(gc *draw2dimg.GraphicContext) bool {
 
 	renderLevel(gc)
 	renderPlayer(gc)
+	renderRayCasting(gc)
 	handleMove()
 
 	return true
 }
 
-func handleMove()  {
+func renderRayCasting(gc *draw2dimg.GraphicContext) {
+	gc.BeginPath()
+
+	var rayX, rayY, rayAngle float64
+	var rayTargetX, rayTargetY float64
+	var mapX, mapY, mapIndex int
+	var dof int
+
+	level := gs.GetLevel()
+	blocSize := gs.GetBlockSize()
+	mapSizeX, mapSizeY := gs.GetMapSize()
+	playerX, playerY, _, _ := gs.GetPlayerPosition()
+
+	rayAngle = gs.GetPlayerAngle()
+
+	for rayN := 0; rayN < 1; rayN++ {
+		// check Horizontal
+		dof = 0
+		aTan := -1 / math.Tan(rayAngle)
+
+		if rayAngle > math.Pi {
+			// looking up
+			rayY = math.Trunc(playerY/float64(blocSize))*float64(blocSize) - 1
+			rayX = (playerY-rayY)*aTan + playerX
+
+			rayTargetY = - float64(blocSize)
+			rayTargetX = - rayTargetY * aTan
+
+			gc.FillStroke()
+		} else if rayAngle < math.Pi {
+			// looking down (ok)
+			rayY = math.Trunc(playerY/float64(blocSize))*float64(blocSize) + float64(blocSize)
+			rayX = (playerY-rayY)*aTan + playerX
+
+			rayTargetY = float64(blocSize)
+			rayTargetX = - rayTargetY * aTan
+		}
+
+		if rayAngle == 0 || rayAngle == math.Pi {
+			rayX = playerX
+			rayY = playerY
+			dof = 8
+		}
+
+		for ; dof < 8; {
+			mapX = int(math.Trunc(rayX / float64(blocSize)))
+			mapY = int(math.Trunc((rayY) / float64(blocSize)))
+
+			mapIndex = mapY*mapSizeX + mapX
+
+			// hit wall
+			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
+				dof = 8
+			} else {
+				rayX += rayTargetX
+				rayY += rayTargetY
+				dof++
+			}
+		}
+
+		gc.SetFillColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
+		gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
+
+		gc.BeginPath()
+		gc.MoveTo(playerX, playerY)
+		gc.LineTo(rayX, rayY)
+		gc.Close()
+		gc.FillStroke()
+
+		// check Vertical
+		dof = 0
+		nTan := -math.Tan(rayAngle)
+		P2 := math.Pi / 2
+		P3 := 3*P2
+
+		if rayAngle > P2 && rayAngle < P3 {
+			// looking left
+			rayX = math.Trunc(playerX/float64(blocSize))*float64(blocSize) - 1
+			rayY = (playerX-rayX)*nTan + playerY
+
+			rayTargetX = - float64(blocSize)
+			rayTargetY = - rayTargetX * nTan
+
+			gc.FillStroke()
+		} else if rayAngle < P2 || rayAngle > P3 {
+			// looking right
+			rayX = math.Trunc(playerX/float64(blocSize))*float64(blocSize) + float64(blocSize)
+			rayY = (playerX-rayX)*nTan + playerY
+
+			rayTargetX = float64(blocSize)
+			rayTargetY = - rayTargetX * nTan
+		}
+
+		if rayAngle == 0 || rayAngle == math.Pi {
+			rayX = playerX
+			rayY = playerY
+			dof = 8
+		}
+
+		for ; dof < 8; {
+			mapX = int(math.Trunc(rayX / float64(blocSize)))
+			mapY = int(math.Trunc((rayY) / float64(blocSize)))
+
+			mapIndex = mapY*mapSizeX + mapX
+
+			// hit wall
+			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
+				dof = 8
+			} else {
+				rayX += rayTargetX
+				rayY += rayTargetY
+				dof++
+			}
+		}
+
+		gc.SetFillColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
+		gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
+
+		gc.BeginPath()
+		gc.MoveTo(playerX, playerY)
+		gc.LineTo(rayX, rayY)
+		gc.Close()
+		gc.FillStroke()
+	}
+}
+
+func handleMove() {
 	if keyboard.up {
 		gs.MoveUp()
 	} else if keyboard.down {
@@ -171,10 +300,11 @@ func renderLevel(gc *draw2dimg.GraphicContext) {
 
 	level := gs.GetLevel()
 	blockSize := gs.GetBlockSize()
+	mapX, mapY := gs.GetMapSize()
 
-	for x := 0; x < 8; x++ {
-		for y := 0; y < 8; y++ {
-			if level[x*8+y] == 0 {
+	for y := 0; y < mapY; y++ {
+		for x := 0; x < mapX; x++ {
+			if level[x+y*mapY] == 0 {
 				// avoid useless rendering
 				continue
 			}
@@ -205,7 +335,7 @@ func renderPlayer(gc *draw2dimg.GraphicContext) {
 	// draw player direction
 	gc.BeginPath()
 	gc.MoveTo(playerX, playerY)
-	gc.LineTo(playerX + playerDeltaX * 5, playerY + playerDeltaY * 5)
+	gc.LineTo(playerX+playerDeltaX*5, playerY+playerDeltaY*5)
 	gc.Close()
 	gc.FillStroke()
 }
