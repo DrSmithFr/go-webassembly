@@ -14,6 +14,14 @@ var DOM *browser.DOM
 var cvs *browser.Canvas2d
 var gs *wolfenstein.GameState
 
+type move struct {
+	up bool
+	down bool
+	left bool
+	right bool
+}
+var keyboard = move{false, false, false, false}
+
 var width float64
 var height float64
 
@@ -55,12 +63,18 @@ func bindEvents(DOM browser.DOM) {
 	DOM.Window.Call("addEventListener", "resize", resizeEventHandler)
 
 	// let's handle key down
-	var keyboardEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		keyboardEvent(DOM, args[0])
+	var keydownEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		keydownEvent(DOM, args[0])
 		return nil
 	})
 
-	DOM.Document.Call("addEventListener", "keydown", keyboardEventHandler)
+	var keyupEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		keyupEvent(DOM, args[0])
+		return nil
+	})
+
+	DOM.Document.Call("addEventListener", "keydown", keydownEventHandler)
+	DOM.Document.Call("addEventListener", "keyup", keyupEventHandler)
 
 	// let's handle that mouse pointer down
 	var mouseEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
@@ -83,21 +97,38 @@ func resizeEvent(DOM browser.DOM, event js.Value) {
 	go DOM.Log(fmt.Sprintf("resizeEvent x:%d y:%d", windowsWidth, windowsHeight))
 }
 
-func keyboardEvent(DOM browser.DOM, event js.Value) {
+func keydownEvent(DOM browser.DOM, event js.Value) {
 	code := event.Get("code").String()
 
 	switch code {
 	case "ArrowUp", "KeyW":
-		gs.MoveUp()
+		keyboard.up = true
 	case "ArrowDown", "KeyS":
-		gs.MoveDown()
+		keyboard.down = true
 	case "ArrowRight", "KeyD":
-		gs.MoveRight()
+		keyboard.right = true
 	case "ArrowLeft", "KeyA":
-		gs.MoveLeft()
+		keyboard.left = true
 	}
 
-	go DOM.Log(fmt.Sprintf("key press:%s", code))
+	//go DOM.Log(fmt.Sprintf("key down:%s", code))
+}
+
+func keyupEvent(DOM browser.DOM, event js.Value) {
+	code := event.Get("code").String()
+
+	switch code {
+	case "ArrowUp", "KeyW":
+		keyboard.up = false
+	case "ArrowDown", "KeyS":
+		keyboard.down = false
+	case "ArrowRight", "KeyD":
+		keyboard.right = false
+	case "ArrowLeft", "KeyA":
+		keyboard.left = false
+	}
+
+	//go DOM.Log(fmt.Sprintf("key up:%s", code))
 }
 
 func clickEvent(DOM browser.DOM, event js.Value) {
@@ -114,8 +145,23 @@ func Render(gc *draw2dimg.GraphicContext) bool {
 
 	renderLevel(gc)
 	renderPlayer(gc)
+	handleMove()
 
 	return true
+}
+
+func handleMove()  {
+	if keyboard.up {
+		gs.MoveUp()
+	} else if keyboard.down {
+		gs.MoveDown()
+	}
+
+	if keyboard.right {
+		gs.MoveRight()
+	} else if keyboard.left {
+		gs.MoveLeft()
+	}
 }
 
 func renderLevel(gc *draw2dimg.GraphicContext) {
@@ -151,12 +197,12 @@ func renderPlayer(gc *draw2dimg.GraphicContext) {
 	gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
 	gc.BeginPath()
 
+	// draw player on screen
 	playerX, playerY, playerDeltaX, playerDeltaY := gs.GetPlayerPosition()
 	draw2dkit.Circle(gc, playerX, playerY, 5)
 	gc.FillStroke()
 
-	// player direction
-	// draw player on screen
+	// draw player direction
 	gc.BeginPath()
 	gc.MoveTo(playerX, playerY)
 	gc.LineTo(playerX + playerDeltaX * 5, playerY + playerDeltaY * 5)
