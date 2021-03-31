@@ -15,7 +15,6 @@ var width float64
 var height float64
 
 var gs = gameState{laserSize: 35, directionX: 13.7, directionY: -13.7, laserX: 40, laserY: 40}
-
 type gameState struct{ laserX, laserY, directionX, directionY, laserSize float64 }
 
 func main() {
@@ -43,12 +42,32 @@ func main() {
 
 func bindEvents(DOM browser.DOM) {
 	// let's handle that mouse pointer down
+	var resizeEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resizeEvent(DOM, args[0])
+		return nil
+	})
+
+	DOM.Window.Call("addEventListener", "resize", resizeEventHandler)
+
+	// let's handle that mouse pointer down
 	var mouseEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		clickEvent(DOM, args[0])
 		return nil
 	})
 
 	DOM.Window.Call("addEventListener", "pointerdown", mouseEventHandler)
+}
+
+func resizeEvent(DOM browser.DOM, event js.Value) {
+	windowsWidth := js.Global().Get("innerWidth").Int()
+	windowsHeight := js.Global().Get("innerHeight").Int()
+
+	cvs.SetSize(windowsWidth, windowsHeight)
+
+	width = float64(windowsWidth)
+	height = float64(windowsHeight)
+
+	go DOM.Log(fmt.Sprintf("resizeEvent x:%d y:%d", windowsWidth, windowsHeight))
 }
 
 func clickEvent(DOM browser.DOM, event js.Value) {

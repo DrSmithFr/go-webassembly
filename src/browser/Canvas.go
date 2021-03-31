@@ -97,6 +97,22 @@ func (c *Canvas2d) Set(canvas js.Value, width int, height int) {
 	c.gctx.FontCache = fontCache
 }
 
+func (c *Canvas2d) SetSize(width int, height int) {
+	c.height = height
+	c.width = width
+
+	c.canvas.Set("height", height)
+	c.canvas.Set("width", width)
+
+	// Setup the 2D Drawing context
+	c.ctx = c.canvas.Call("getContext", "2d")
+	c.imgData = c.ctx.Call("createImageData", width, height) // Note Width, then Height
+	c.image = image.NewRGBA(image.Rect(0, 0, width, height))
+	c.copybuff = js.Global().Get("Uint8Array").New(len(c.image.Pix)) // Static JS buffer for copying data out to JS. Defined once and re-used to save on un-needed allocations
+
+	c.gctx = draw2dimg.NewGraphicContext(c.image)
+}
+
 // Starts the annimationFrame callbacks running.   (Recently seperated from Create / Set to give better control for when things start / stop)
 func (c *Canvas2d) Start(maxFPS float64, rf RenderFunc) {
 	c.SetFPS(maxFPS)
