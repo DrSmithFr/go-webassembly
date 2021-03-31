@@ -173,6 +173,10 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 		dof = 0
 		aTan := -1 / math.Tan(rayAngle)
 
+		distH:=1000000.0
+		hx := playerX
+		hy := playerY
+
 		if rayAngle > math.Pi {
 			// looking up
 			rayY = math.Trunc(playerY/float64(blocSize))*float64(blocSize) - 1
@@ -180,8 +184,6 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 
 			rayTargetY = - float64(blocSize)
 			rayTargetX = - rayTargetY * aTan
-
-			gc.FillStroke()
 		} else if rayAngle < math.Pi {
 			// looking down (ok)
 			rayY = math.Trunc(playerY/float64(blocSize))*float64(blocSize) + float64(blocSize)
@@ -206,6 +208,9 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			// hit wall
 			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
 				dof = 8
+				hx = rayX
+				hy = rayY
+				distH = dist(playerX, playerY, hx, hy, rayAngle)
 			} else {
 				rayX += rayTargetX
 				rayY += rayTargetY
@@ -213,20 +218,15 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			}
 		}
 
-		gc.SetFillColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
-		gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0xff, 0xff})
-
-		gc.BeginPath()
-		gc.MoveTo(playerX, playerY)
-		gc.LineTo(rayX, rayY)
-		gc.Close()
-		gc.FillStroke()
-
 		// check Vertical
 		dof = 0
 		nTan := -math.Tan(rayAngle)
 		P2 := math.Pi / 2
 		P3 := 3*P2
+
+		distV:=1000000.0
+		vx := playerX
+		vy := playerY
 
 		if rayAngle > P2 && rayAngle < P3 {
 			// looking left
@@ -235,8 +235,6 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 
 			rayTargetX = - float64(blocSize)
 			rayTargetY = - rayTargetX * nTan
-
-			gc.FillStroke()
 		} else if rayAngle < P2 || rayAngle > P3 {
 			// looking right
 			rayX = math.Trunc(playerX/float64(blocSize))*float64(blocSize) + float64(blocSize)
@@ -260,12 +258,25 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 
 			// hit wall
 			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
+				vx = rayX
+				vy = rayY
+				distV = dist(playerX, playerY, vx, vy, rayAngle)
 				dof = 8
 			} else {
 				rayX += rayTargetX
 				rayY += rayTargetY
 				dof++
 			}
+		}
+
+		if distV < distH {
+			rayX=vx
+			rayY=vy
+		}
+
+		if distH < distV {
+			rayX=hx
+			rayY=hy
 		}
 
 		gc.SetFillColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
@@ -277,6 +288,10 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 		gc.Close()
 		gc.FillStroke()
 	}
+}
+
+func dist(aX, aY, bX, bY, angle float64) float64  {
+	return math.Sqrt((bX - aX)*(bX - aX) + (bY-aY)*(bY-aY))
 }
 
 func handleMove() {
