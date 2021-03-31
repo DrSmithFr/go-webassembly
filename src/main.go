@@ -3,36 +3,41 @@ package main
 import (
 	"fmt"
 	"github.com/DrSmithFr/go-webassembly/src/browser"
+	"github.com/DrSmithFr/go-webassembly/src/wolfenstein"
 	"github.com/llgcode/draw2d/draw2dimg"
 	"github.com/llgcode/draw2d/draw2dkit"
 	"image/color"
 	"syscall/js"
 )
 
+var DOM *browser.DOM
 var cvs *browser.Canvas2d
+var gs *wolfenstein.GameState
 
 var width float64
 var height float64
 
-var gs = gameState{laserSize: 35, directionX: 13.7, directionY: -13.7, laserX: 40, laserY: 40}
-type gameState struct{ laserX, laserY, directionX, directionY, laserSize float64 }
-
 func main() {
 	// loading DOM to memory
-	DOM := browser.LoadDOM()
+	DOM = browser.LoadDOM()
 
 	// setting up everything
-	bindEvents(DOM)
+	bindEvents(*DOM)
 
+	// create canvas
 	cvs, _ = browser.NewCanvas2d(false)
 	cvs.Create(
 		js.Global().Get("innerWidth").Int(),
 		js.Global().Get("innerHeight").Int(),
 	)
 
+	// create gameState
+	gs, _ = wolfenstein.NewGameState(cvs.Width(), cvs.Height())
+
 	height = float64(cvs.Height())
 	width = float64(cvs.Width())
 
+	// starting rendering
 	cvs.Start(120, Render)
 
 	// allow daemon style process
@@ -78,29 +83,50 @@ func clickEvent(DOM browser.DOM, event js.Value) {
 }
 
 func Render(gc *draw2dimg.GraphicContext) bool {
-
-	if gs.laserX+gs.directionX > width-gs.laserSize || gs.laserX+gs.directionX < gs.laserSize {
-		gs.directionX = -gs.directionX
-	}
-	if gs.laserY+gs.directionY > height-gs.laserSize || gs.laserY+gs.directionY < gs.laserSize {
-		gs.directionY = -gs.directionY
-	}
-
-	gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
+	// render default color
+	gc.SetFillColor(color.RGBA{0x18, 0x18, 0x18, 0xff})
 	gc.Clear()
-	// move red laser
-	gs.laserX += gs.directionX
-	gs.laserY += gs.directionY
 
-	// draws red 🔴 laser
-	gc.SetFillColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
-	gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
-
-	gc.BeginPath()
-	// gc.ArcTo(gs.laserX, gs.laserY, gs.laserSize, gs.laserSize, 0, math.Pi*2)
-	draw2dkit.Circle(gc, gs.laserX, gs.laserY, gs.laserSize)
-	gc.FillStroke()
-	gc.Close()
+	renderLevel(gc)
+	renderPlayer(gc)
 
 	return true
+}
+
+func renderLevel(gc *draw2dimg.GraphicContext) {
+	gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
+	gc.SetStrokeColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
+	gc.BeginPath()
+
+	level := gs.GetLevel()
+	blockSize := gs.GetBlockSize()
+
+	for x := 0; x < 8; x++ {
+		for y := 0; y < 8; y++ {
+			if level[x*8+y] == 0 {
+				// avoid useless rendering
+				continue
+			}
+
+			draw2dkit.Rectangle(
+				gc,
+				float64(x*blockSize+1),
+				float64(y*blockSize+1),
+				float64(x*blockSize+blockSize-1),
+				float64(y*blockSize+blockSize-1),
+			)
+			gc.FillStroke()
+		}
+	}
+}
+
+func renderPlayer(gc *draw2dimg.GraphicContext) {
+	// draw player on screen
+	gc.SetFillColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
+	gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
+	gc.BeginPath()
+
+	playerX, playerY := gs.GetPlayerPosition()
+	draw2dkit.Circle(gc, float64(playerX), float64(playerY), 5)
+	gc.FillStroke()
 }

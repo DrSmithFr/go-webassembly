@@ -4,7 +4,7 @@ import (
 	"syscall/js"
 )
 
-func LoadDOM() DOM {
+func LoadDOM() *DOM {
 	// loading default DOM data
 	window := js.Global()
 	document := window.Get("document")
@@ -17,7 +17,7 @@ func LoadDOM() DOM {
 	}
 
 	// returning DOM
-	return DOM{
+	return &DOM{
 		Window:   window,
 		Document: document,
 		Body:     body,
