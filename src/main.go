@@ -46,13 +46,21 @@ func main() {
 }
 
 func bindEvents(DOM browser.DOM) {
-	// let's handle that mouse pointer down
+	// let's handle windows resize
 	var resizeEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		resizeEvent(DOM, args[0])
 		return nil
 	})
 
 	DOM.Window.Call("addEventListener", "resize", resizeEventHandler)
+
+	// let's handle key down
+	var keyboardEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		keyboardEvent(DOM, args[0])
+		return nil
+	})
+
+	DOM.Document.Call("addEventListener", "keydown", keyboardEventHandler)
 
 	// let's handle that mouse pointer down
 	var mouseEventHandler = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
@@ -73,6 +81,23 @@ func resizeEvent(DOM browser.DOM, event js.Value) {
 	height = float64(windowsHeight)
 
 	go DOM.Log(fmt.Sprintf("resizeEvent x:%d y:%d", windowsWidth, windowsHeight))
+}
+
+func keyboardEvent(DOM browser.DOM, event js.Value) {
+	code := event.Get("code").String()
+
+	switch code {
+	case "ArrowUp", "KeyW":
+		gs.MoveUp()
+	case "ArrowDown", "KeyS":
+		gs.MoveDown()
+	case "ArrowRight", "KeyD":
+		gs.MoveRight()
+	case "ArrowLeft", "KeyA":
+		gs.MoveLeft()
+	}
+
+	go DOM.Log(fmt.Sprintf("key press:%s", code))
 }
 
 func clickEvent(DOM browser.DOM, event js.Value) {
@@ -122,11 +147,19 @@ func renderLevel(gc *draw2dimg.GraphicContext) {
 
 func renderPlayer(gc *draw2dimg.GraphicContext) {
 	// draw player on screen
-	gc.SetFillColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
-	gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0xff, 0xff})
+	gc.SetFillColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
+	gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
 	gc.BeginPath()
 
-	playerX, playerY := gs.GetPlayerPosition()
-	draw2dkit.Circle(gc, float64(playerX), float64(playerY), 5)
+	playerX, playerY, playerDeltaX, playerDeltaY := gs.GetPlayerPosition()
+	draw2dkit.Circle(gc, playerX, playerY, 5)
+	gc.FillStroke()
+
+	// player direction
+	// draw player on screen
+	gc.BeginPath()
+	gc.MoveTo(playerX, playerY)
+	gc.LineTo(playerX + playerDeltaX * 5, playerY + playerDeltaY * 5)
+	gc.Close()
 	gc.FillStroke()
 }
