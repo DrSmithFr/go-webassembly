@@ -8,6 +8,7 @@ import (
 	"github.com/llgcode/draw2d/draw2dkit"
 	"image/color"
 	"math"
+	"runtime"
 	"syscall/js"
 )
 
@@ -40,6 +41,8 @@ func main() {
 		js.Global().Get("innerWidth").Int(),
 		js.Global().Get("innerHeight").Int(),
 	)
+
+	DOM.Log(fmt.Sprintf("number of thread: %d", runtime.NumCPU()))
 
 	// create gameState
 	gs, _ = wolfenstein.NewGameState(cvs.Width(), cvs.Height())
@@ -147,7 +150,13 @@ func Render(gc *draw2dimg.GraphicContext) bool {
 
 	renderLevel(gc)
 	renderPlayer(gc)
-	renderRayCasting(gc)
+
+	if false {
+		renderRayCasting(gc)
+	}else {
+		gs.RenderRay(gc)
+	}
+
 	handleMove()
 
 	return true
@@ -160,20 +169,28 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 	var rayTargetX, rayTargetY float64
 	var mapX, mapY, mapIndex int
 	var dof int
+	var distT float64
 
 	level := gs.GetLevel()
 	blocSize := gs.GetBlockSize()
-	mapSizeX, mapSizeY := gs.GetMapSize()
+	mapSize := gs.GetMapSize()
 	playerX, playerY, _, _ := gs.GetPlayerPosition()
 
+	oneRadian := 0.0174533
 	rayAngle = gs.GetPlayerAngle()
+
+	if rayAngle < 0 {
+		rayAngle += 2 * math.Pi
+	} else if rayAngle > 2*math.Pi {
+		rayAngle -= 2 * math.Pi
+	}
 
 	for rayN := 0; rayN < 1; rayN++ {
 		// check Horizontal
 		dof = 0
 		aTan := -1 / math.Tan(rayAngle)
 
-		distH:=1000000.0
+		distH := 1000000.0
 		hx := playerX
 		hy := playerY
 
@@ -185,7 +202,7 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			rayTargetY = - float64(blocSize)
 			rayTargetX = - rayTargetY * aTan
 		} else if rayAngle < math.Pi {
-			// looking down (ok)
+			// looking down
 			rayY = math.Trunc(playerY/float64(blocSize))*float64(blocSize) + float64(blocSize)
 			rayX = (playerY-rayY)*aTan + playerX
 
@@ -203,10 +220,10 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			mapX = int(math.Trunc(rayX / float64(blocSize)))
 			mapY = int(math.Trunc((rayY) / float64(blocSize)))
 
-			mapIndex = mapY*mapSizeX + mapX
+			mapIndex = mapY*mapSize + mapX
 
 			// hit wall
-			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
+			if mapIndex > 0 && mapIndex < mapSize*mapSize && level[mapIndex] == 1 {
 				dof = 8
 				hx = rayX
 				hy = rayY
@@ -222,9 +239,9 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 		dof = 0
 		nTan := -math.Tan(rayAngle)
 		P2 := math.Pi / 2
-		P3 := 3*P2
+		P3 := 3 * P2
 
-		distV:=1000000.0
+		distV := 1000000.0
 		vx := playerX
 		vy := playerY
 
@@ -254,10 +271,10 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			mapX = int(math.Trunc(rayX / float64(blocSize)))
 			mapY = int(math.Trunc((rayY) / float64(blocSize)))
 
-			mapIndex = mapY*mapSizeX + mapX
+			mapIndex = mapY*mapSize + mapX
 
 			// hit wall
-			if mapIndex > 0 && mapIndex < mapSizeX*mapSizeY && level[mapIndex] == 1 {
+			if mapIndex > 0 && mapIndex < mapSize*mapSize && level[mapIndex] == 1 {
 				vx = rayX
 				vy = rayY
 				distV = dist(playerX, playerY, vx, vy, rayAngle)
@@ -269,29 +286,72 @@ func renderRayCasting(gc *draw2dimg.GraphicContext) {
 			}
 		}
 
+		// vertical wall
 		if distV < distH {
-			rayX=vx
-			rayY=vy
+			rayX = vx
+			rayY = vy
+			distT = distV
+
+			gc.SetFillColor(color.RGBA{0xE5, 0x00, 0x00, 0xff})
+			gc.SetStrokeColor(color.RGBA{0xE5, 0x00, 0x00, 0xff})
 		}
 
+		// horizontal wall
 		if distH < distV {
-			rayX=hx
-			rayY=hy
+			rayX = hx
+			rayY = hy
+			distT = distH
+
+			gc.SetFillColor(color.RGBA{0xb2, 0x00, 0x00, 0xff})
+			gc.SetStrokeColor(color.RGBA{0xb2, 0x00, 0x00, 0xff})
 		}
 
-		gc.SetFillColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
-		gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
-
+		// render raycast
 		gc.BeginPath()
 		gc.MoveTo(playerX, playerY)
 		gc.LineTo(rayX, rayY)
 		gc.Close()
 		gc.FillStroke()
+
+		// render 3D walls
+		ca := gs.GetPlayerAngle() - rayAngle
+		if ca < 0 {
+			ca += 2 * math.Pi
+		}
+		if ca > 2*math.Pi {
+			ca -= 2 * math.Pi
+		}
+		distT = distT * math.Cos(ca) // fix fisheye
+
+		lineH := float64(mapSize*320) / distT
+		if lineH > 320 {
+			lineH = 320
+		}
+
+		lineOffset := (320 / 2) - lineH/2
+
+		draw2dkit.Rectangle(
+			gc,
+			float64(rayN*8+530),
+			lineOffset,
+			float64(rayN*8+530)+8,
+			lineH+lineOffset,
+		)
+		gc.FillStroke()
+
+		// updating angle for next ray
+		rayAngle += oneRadian
+
+		if rayAngle < 0 {
+			rayAngle += 2 * math.Pi
+		} else if rayAngle > 2*math.Pi {
+			rayAngle -= 2 * math.Pi
+		}
 	}
 }
 
-func dist(aX, aY, bX, bY, angle float64) float64  {
-	return math.Sqrt((bX - aX)*(bX - aX) + (bY-aY)*(bY-aY))
+func dist(aX, aY, bX, bY, angle float64) float64 {
+	return math.Sqrt((bX-aX)*(bX-aX) + (bY-aY)*(bY-aY))
 }
 
 func handleMove() {
@@ -315,11 +375,11 @@ func renderLevel(gc *draw2dimg.GraphicContext) {
 
 	level := gs.GetLevel()
 	blockSize := gs.GetBlockSize()
-	mapX, mapY := gs.GetMapSize()
+	mapSize := gs.GetMapSize()
 
-	for y := 0; y < mapY; y++ {
-		for x := 0; x < mapX; x++ {
-			if level[x+y*mapY] == 0 {
+	for y := 0; y < mapSize; y++ {
+		for x := 0; x < mapSize; x++ {
+			if level[x+y*mapSize] == 0 {
 				// avoid useless rendering
 				continue
 			}
